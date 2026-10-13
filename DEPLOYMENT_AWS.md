@@ -1,66 +1,79 @@
-# AWS EC2 Deployment Guide | Group9-Log-Aggregator
+# AWS EC2 & ALB Deployment Guide | Group9-Log-Aggregator
 
-This guide walks through deploying the **Group9 Distributed Log Aggregator & Indexer** on a small Ubuntu EC2 instance (`t3.small` or `t3.medium`) backed by Docker Compose, an isolated internal Elasticsearch container, S3 cold storage archival, and Amazon CloudWatch monitoring.
+This guide walks through deploying the **Group9 Distributed Log Aggregator & Indexer** in **AWS Mumbai (`ap-south-1`)** backed by an **Application Load Balancer (ALB)**, Ubuntu EC2 instance (`t3.small`), Docker Compose, isolated internal Elasticsearch, S3 cold storage archival, and Amazon CloudWatch monitoring.
 
 ---
 
 ## 1. Architecture & Security Model
 
 ```
-                    Internet / Log Agents
-                              │
+                    Internet / Log Agents / End Users
+                                │
                     Port 80 (HTTP) / 443 (HTTPS)
-                              ▼
-                ┌──────────────────────────────┐
-                │   Nginx Reverse Proxy & UI   │
-                │     (frontend container)     │
-                └──────────────┬───────────────┘
-                               │
-            Internal Docker Network (group9-network)
-                               │
-                ┌──────────────▼───────────────┐
-                │        FastAPI Backend       │
-                │      (backend container)     │
-                └──────────────┬───────────────┘
-                               │
-                     Internal Network Only
-                   (Port 9200 NOT exposed)
-                               │
-                ┌──────────────▼───────────────┐
-                │     Elasticsearch Indexer    │
-                │   (group9-es-prod container) │
-                └──────────────┬───────────────┘
-                               │
-                    EBS Volume (es_prod_data)
-
-      Scheduled Cron               CloudWatch Agent
-            │                             │
-    ┌───────▼────────┐           ┌────────▼────────┐
-    │  S3 Archiver   │           │ Host & Container│
-    │ (boto3 script) │           │     Metrics     │
-    └───────┬────────┘           └────────┬────────┘
-            ▼                             ▼
-    Amazon S3 Bucket              Amazon CloudWatch
-  (group9-log-archives)           (/aws/ec2/group9/...)
+                                ▼
+         ┌──────────────────────────────────────────────┐
+         │     AWS Application Load Balancer (ALB)      │
+         │  (group9-alb-sg: Public 80/443 Inbound)      │
+         │  • Multi-AZ Listeners (ap-south-1a & 1b)     │
+         │  • Health Check Target Probe: /health/live   │
+         └──────────────────────┬───────────────────────┘
+                                │ Forward Port 80
+                                │ (VPC Internal Network)
+                                ▼
+         ┌──────────────────────────────────────────────┐
+         │           Amazon EC2 Instance (Ubuntu)        │
+         │  (group9-ec2-sg: Port 80 ONLY from ALB SG,   │
+         │                  Port 22 from Admin IP)      │
+         │                                              │
+         │   ┌──────────────────────────────────────┐   │
+         │   │       Nginx Reverse Proxy & UI       │   │
+         │   │         (frontend container)         │   │
+         │   └──────────────────┬───────────────────┘   │
+         │                      │ Internal Docker       │
+         │                      │ (group9-network)      │
+         │   ┌──────────────────▼───────────────────┐   │
+         │   │           FastAPI Backend            │   │
+         │   │         (backend container)          │   │
+         │   └──────────────────┬───────────────────┘   │
+         │                      │ Internal Docker       │
+         │                      │ (Port 9200 NOT exposed)
+         │   ┌──────────────────▼───────────────────┐   │
+         │   │        Elasticsearch Indexer         │   │
+         │   │      (group9-es-prod container)      │   │
+         │   └──────────────────┬───────────────────┘   │
+         │                      │                       │
+         │           EBS Volume (es_prod_data)          │
+         └──────────────────────┬───────────────────────┘
+                                │
+        ┌───────────────────────┴───────────────────────┐
+        │ IAM Role: Group9-LogAggregator-EC2Role        │
+        │ (Temporary STS credentials - No hardcoded keys│
+        ├───────────────────────┬───────────────────────┤
+        ▼                       ▼                       ▼
+ Amazon S3 Cold Storage     CloudWatch Agent       CloudWatch Logs
+ (group9-log-archives)     (Host & Disk Metrics)   (/aws/ec2/group9/...)
 ```
 
 ### Key Security Principles
-1. **Elasticsearch is Never Exposed**: Port `9200` is strictly internal to Docker's bridge network. No external agent or browser can reach Elasticsearch directly.
-2. **No Hardcoded Credentials**: The EC2 instance accesses S3 and CloudWatch via an attached **IAM Instance Profile** using temporary AWS STS credentials.
-3. **Restricted Admin Access**: Port `22` (SSH) is limited to your IP address.
+1. **ALB-Only Public Ingress**: Public users and agents access the ALB. The EC2 instance security group allows HTTP port 80 **strictly from the ALB's security group ID**.
+2. **Elasticsearch is Never Exposed**: Port `9200` is strictly internal to Docker's bridge network. No external agent or browser can reach Elasticsearch directly.
+3. **FastAPI is Never Directly Exposed**: Port `8000` is internal to Docker. All requests pass through Nginx on port 80.
+4. **No Hardcoded Credentials**: The EC2 instance accesses S3 and CloudWatch via an attached **IAM Instance Profile** using temporary AWS STS credentials.
+5. **Restricted Admin Access**: Port `22` (SSH) is restricted to your specific workstation IP.
 
 ---
 
-## 2. AWS Prerequisites & Setup
+## 2. AWS Prerequisites & Setup (Region: Mumbai `ap-south-1`)
 
 ### A. Create S3 Bucket for Cold Storage
-In the AWS Console or via AWS CLI:
+In the AWS Console or via AWS CLI in `ap-south-1`:
 ```bash
 aws s3api create-bucket \
   --bucket group9-log-archives \
-  --region us-east-1
+  --region ap-south-1 \
+  --create-bucket-configuration LocationConstraint=ap-south-1
 ```
-Enable bucket default encryption (AES256) and block public access.
+Enable bucket default encryption (AES256) and block all public access.
 
 ### B. Create IAM Role & Instance Profile
 1. Create an IAM Role named `Group9-LogAggregator-EC2Role` with trust policy for `ec2.amazonaws.com`.
@@ -68,20 +81,20 @@ Enable bucket default encryption (AES256) and block public access.
 3. Create an Instance Profile with the same name and attach it to the role.
 
 ### C. Security Group Configuration
-Create a Security Group named `group9-log-aggregator-sg`:
 
-#### Inbound Rules
+#### 1. ALB Security Group (`group9-alb-sg`)
 | Type | Port Range | Protocol | Source | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
-| **HTTP** | `80` | TCP | `0.0.0.0/0` | React Dashboard & Log Ingestion API |
-| **HTTPS** | `443` | TCP | `0.0.0.0/0` | Secure web access (if TLS configured) |
-| **SSH** | `22` | TCP | `YOUR_IP/32` | Secure administrative shell access |
-| **Custom** | `9200` | TCP | **NONE** | **NEVER OPEN ELASTICSEARCH PUBLICLY** |
+| **HTTP** | `80` | TCP | `0.0.0.0/0` | Public dashboard access & log ingestion |
+| **HTTPS**| `443`| TCP | `0.0.0.0/0` | Secure public access (when ACM certificate added) |
 
-#### Outbound Rules
-| Type | Port Range | Protocol | Destination | Purpose |
+#### 2. EC2 Instance Security Group (`group9-ec2-sg`)
+| Type | Port Range | Protocol | Source | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
-| **All Traffic** | All | All | `0.0.0.0/0` | S3 API, CloudWatch API, Docker registries |
+| **HTTP** | `80` | TCP | `sg-xxxx (group9-alb-sg)` | Allow traffic **strictly** from the ALB |
+| **SSH**  | `22` | TCP | `YOUR_IP/32` | Administrative shell access |
+| **Custom** | `8000` | TCP | **NONE** | **Never expose FastAPI directly** |
+| **Custom** | `9200` | TCP | **NONE** | **Never expose Elasticsearch directly** |
 
 ---
 
@@ -92,7 +105,7 @@ Launch an EC2 instance:
 - **Instance Type**: `t3.small` (2 vCPU, 2 GiB RAM) or `t3.medium` (2 vCPU, 4 GiB RAM)
 - **Storage**: 20–30 GiB gp3 EBS volume
 - **IAM Instance Profile**: `Group9-LogAggregator-EC2Role`
-- **Security Group**: `group9-log-aggregator-sg`
+- **Security Group**: `group9-ec2-sg`
 
 SSH into the instance:
 ```bash
@@ -147,7 +160,7 @@ newgrp docker
 
 ---
 
-## 4. Deploying the Application
+## 4. Deploying the Application via Docker Compose
 
 ### Step 1: Clone Repository
 ```bash
@@ -178,9 +191,63 @@ Output should indicate:
 - `group9-backend-prod` is **healthy** (running FastAPI on port 8000 internally)
 - `group9-frontend-prod` is **running** (serving React via Nginx on port 80)
 
+Verify local HTTP response:
+```bash
+curl http://localhost/health/live
+```
+Must return `{"status":"live"}`.
+
 ---
 
-## 5. End-to-End Verification
+## 5. Application Load Balancer (ALB) Setup
+
+Now that the application container is actively serving traffic on port 80, create and link the ALB.
+
+### Step 1: Create Target Group (`group9-alb-tg`)
+In the AWS Console (EC2 -> Target Groups) or AWS CLI:
+1. **Target type**: Instances
+2. **Target group name**: `group9-alb-tg`
+3. **Protocol**: `HTTP`, **Port**: `80`
+4. **VPC**: Default VPC
+5. **Health check settings**:
+   - **Protocol**: HTTP
+   - **Path**: `/health/live`
+   - **Healthy threshold**: 2
+   - **Unhealthy threshold**: 2
+   - **Timeout**: 5 seconds
+   - **Interval**: 15 seconds
+   - **Success codes**: 200
+
+### Step 2: Create Public Application Load Balancer (`group9-alb`)
+In EC2 -> Load Balancers -> Create Application Load Balancer:
+1. **Name**: `group9-alb`
+2. **Scheme**: Internet-facing
+3. **IP address type**: IPv4
+4. **Network mapping**: Select your default VPC and at least two Availability Zones (e.g. `ap-south-1a` and `ap-south-1b`).
+5. **Security groups**: Select `group9-alb-sg` (allows inbound 80/443).
+6. **Listeners and routing**:
+   - **Protocol**: HTTP, **Port**: 80
+   - **Default action**: Forward to `group9-alb-tg`
+7. *(Optional HTTPS)*: If you possess a domain name, request an AWS Certificate Manager (ACM) SSL certificate in `ap-south-1`, add an HTTPS:443 listener forwarding to `group9-alb-tg`, and set HTTP:80 to redirect to HTTPS:443.
+
+### Step 3: Register EC2 Target
+1. In Target Groups -> `group9-alb-tg` -> **Register targets**.
+2. Select your launched EC2 instance (`Port: 80`).
+3. Click **Include as pending below** and **Register pending targets**.
+4. Monitor target status until it transitions from `initial` -> `healthy`.
+
+---
+
+## 6. End-to-End Verification via ALB
+
+Once the ALB target group reports the EC2 instance as **healthy**:
+
+### Test 1: Access Web Dashboard via ALB DNS
+Copy the DNS name of your ALB from the AWS Console (e.g., `http://group9-alb-xxxx.ap-south-1.elb.amazonaws.com/`).
+Open it in your web browser:
+- The React single-page dashboard loads securely.
+- Real-time KPI stats and cluster status are online.
+- Network requests route: Browser -> ALB:80 -> EC2 Nginx:80 -> FastAPI:8000 -> Elasticsearch:9200.
 
 ### Test 1: Service Health Endpoints
 ```bash
@@ -220,7 +287,7 @@ You will see the dark-mode dashboard displaying live statistics, cluster health,
 
 ---
 
-## 6. S3 Historical Log Archival Setup
+## 7. S3 Historical Log Archival Setup
 
 The archival script compresses eligible logs using `gzip` and uploads them to S3 with `AES256` encryption.
 
@@ -256,7 +323,7 @@ Add the following entry to execute every day at 02:00 AM UTC:
 
 ---
 
-## 7. Amazon CloudWatch Agent Setup
+## 8. Amazon CloudWatch Agent Setup
 
 Stream CPU, Memory, Disk, and log files to CloudWatch.
 
@@ -290,7 +357,7 @@ sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
 
 ---
 
-## 8. Maintenance & Troubleshooting
+## 9. Maintenance & Troubleshooting
 
 ### Viewing Container Logs
 ```bash

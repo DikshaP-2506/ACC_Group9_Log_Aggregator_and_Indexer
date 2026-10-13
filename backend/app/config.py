@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     # CORS configuration
     cors_origins: str = "*"
 
-    # AWS & Archival configuration
-    aws_region: str = "us-east-1"
+    # AWS & Archival configuration (ap-south-1 Mumbai)
+    aws_region: str = "ap-south-1"
     s3_bucket_name: str = ""
     log_retention_days: int = 7
 

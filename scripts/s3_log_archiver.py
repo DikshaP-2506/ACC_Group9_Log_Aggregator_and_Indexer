@@ -49,7 +49,7 @@ class S3LogArchiver:
     def __init__(
         self,
         bucket_name: str,
-        region_name: str = "us-east-1",
+        region_name: str = "ap-south-1",
         retention_days: int = 7,
         dry_run: bool = False,
         s3_client: Optional[Any] = None
@@ -268,7 +268,7 @@ class S3LogArchiver:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Archive historical logs to Amazon S3 cold storage.")
     parser.add_argument("--bucket", default=os.getenv("S3_BUCKET_NAME", ""), help="Target S3 Bucket Name")
-    parser.add_argument("--region", default=os.getenv("AWS_REGION", "us-east-1"), help="AWS Region (default: us-east-1)")
+    parser.add_argument("--region", default=os.getenv("AWS_REGION", "ap-south-1"), help="AWS Region (default: ap-south-1)")
     parser.add_argument("--retention-days", type=int, default=int(os.getenv("LOG_RETENTION_DAYS", "7")), help="Retention threshold in days")
     parser.add_argument("--log-dir", default=os.getenv("LOG_DIR", "logs"), help="Path to local logs directory")
     parser.add_argument("--from-es", action="store_true", help="Also archive historical documents directly from Elasticsearch")
