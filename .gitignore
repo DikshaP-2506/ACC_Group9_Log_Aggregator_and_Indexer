@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.pytest_cache/
+*.egg-info/
+
+# Environment and Secrets (Never commit secrets to git)
+*.env
+.env
+.env.*
+!.env.example
+.aws/
+credentials
+config
+
+# SSH & SSL Keys / Certificates
+*.pem
+*.key
+*.cert
+*.id_rsa
+*.id_ed25519
+
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Elasticsearch / Docker
+es_data/
+es_prod_data/
+
+# Logs & Agent Offsets
+logs/
+*.log
+*.offset
+
+# S3 Archives & Temporary Bundles
+archives/
+*.tar.gz
+*.gz
+*.zip
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+

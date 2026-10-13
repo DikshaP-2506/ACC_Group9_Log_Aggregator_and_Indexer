@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    container_name: group9-elasticsearch
+    environment:
+      # Single-node configuration: disables cluster formation requirements
+      - discovery.type=single-node
+      # Disable security exclusively for local development to simplify REST access
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      # JVM memory limit: 512MB heap is lightweight and safe for student laptops
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      # Map container port 9200 to host port 9200 for REST API access
+      - "9200:9200"
+    volumes:
+      # Named volume ensures indexed log data persists across container restarts
+      - es_data:/usr/share/elasticsearch/data
+    networks:
+      - logging-network
+    restart: unless-stopped
+
+volumes:
+  es_data:
+    driver: local
+
+networks:
+  logging-network:
+    driver: bridge

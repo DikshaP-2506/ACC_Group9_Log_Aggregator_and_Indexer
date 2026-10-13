@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    container_name: group9-es-prod
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    # CRITICAL SECURITY NOTE:
+    # Port 9200 is intentionally NOT published to host (no "9200:9200").
+    # Elasticsearch is isolated on the internal group9-network bridge and
+    # can only be reached by the backend service.
+    volumes:
+      - es_prod_data:/usr/share/elasticsearch/data
+    networks:
+      - group9-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: group9-backend-prod
+    environment:
+      - APP_NAME=Group9-Log-Aggregator
+      - APP_ENV=production
+      - DEBUG=False
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8000
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - LOG_INDEX_NAME=logs
+      - CORS_ORIGINS=*
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - group9-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -f http://localhost:8000/health/live || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: group9-frontend-prod
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - group9-network
+    restart: unless-stopped
+
+volumes:
+  es_prod_data:
+    driver: local
+
+networks:
+  group9-network:
+    driver: bridge
