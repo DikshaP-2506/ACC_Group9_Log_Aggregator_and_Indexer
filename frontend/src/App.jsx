@@ -125,7 +125,6 @@ export default function App() {
     return ['partition-0', 'partition-1', 'partition-2'];
   }, [partitionsData]);
 
-  // Reset filters
   const handleResetFilters = () => {
     setQuery('');
     setLevel('');
@@ -142,6 +141,7 @@ export default function App() {
 
   return (
     <div className="app-container">
+      {/* Top Header */}
       <Header
         health={health}
         autoRefresh={autoRefresh}
@@ -152,6 +152,7 @@ export default function App() {
         stats={stats}
       />
 
+      {/* KPI Cards (Real Elasticsearch Data) */}
       <StatsCards
         stats={stats}
         totalFallback={total}
@@ -161,6 +162,7 @@ export default function App() {
         totalPartitionsCount={partitionsData?.total_partitions}
       />
 
+      {/* Search & Filter Bar */}
       <FilterBar
         query={query}
         setQuery={setQuery}
@@ -180,6 +182,7 @@ export default function App() {
         totalResults={total}
       />
 
+      {/* Main Log Stream Table */}
       <LogTable
         logs={logs}
         total={total}
@@ -194,11 +197,13 @@ export default function App() {
         onClearFilters={handleResetFilters}
       />
 
+      {/* Document Inspector Modal */}
       <LogDetailModal
         log={selectedLog}
         onClose={() => setSelectedLog(null)}
       />
 
+      {/* Ingest Log Modal */}
       {showIngestModal && (
         <TestLogModal
           onClose={() => setShowIngestModal(false)}

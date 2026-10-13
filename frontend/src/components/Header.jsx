@@ -18,47 +18,47 @@ export default function Header({
     <header className="header-card">
       <div className="header-brand-block">
         <div className="brand-logo-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
           </svg>
         </div>
         <div className="header-title-group">
           <div className="brand-title-row">
-            <h1>LogSphere // Group 9</h1>
-            <span className="brand-tag">Enterprise Observability</span>
+            <h1>Group 9 Log Aggregator</h1>
+            <span className="brand-tag">Distributed</span>
           </div>
           <p>
-            Elasticsearch Inverted Index &bull; Consistent Hash Routing &bull; Resilient Microservice Shippers
+            Real-time telemetry ingestion, consistent-hash routing &amp; inverted-index search
           </p>
         </div>
       </div>
 
       <div className="header-actions">
-        {/* Dynamic Cluster Health Badge */}
+        {/* Clean Cluster Health Badge */}
         <div
-          className={`health-badge ${isHealthy ? clusterStatus : 'degraded'}`}
-          title={`Elasticsearch Cluster: ${clusterName} (${clusterStatus}). Total documents: ${totalCount}`}
+          className={`health-badge ${isHealthy ? 'online' : 'degraded'}`}
+          title={`Elasticsearch: ${clusterName} (${clusterStatus})`}
         >
           <span className="pulse-dot" />
           <span className="cluster-label">
-            {isHealthy
-              ? `ES: ${clusterName} (${clusterStatus})`
-              : 'ES: Offline'}
+            {isHealthy ? 'Cluster Online' : 'Cluster Offline'}
           </span>
-          {isHealthy && totalCount > 0 && (
-            <span className="doc-count-pill">{totalCount.toLocaleString()} docs</span>
+          {isHealthy && (
+            <span className="doc-count-pill">
+              {totalCount.toLocaleString()} logs
+            </span>
           )}
         </div>
 
-        {/* Dynamic Auto-Refresh Toggle */}
+        {/* Live Stream Auto-Refresh Toggle */}
         <button
           type="button"
           className={`btn-action btn-refresh-toggle ${autoRefresh ? 'active' : ''}`}
           onClick={() => setAutoRefresh(!autoRefresh)}
-          title="Toggle live log stream auto-polling"
+          title="Toggle live stream auto-refresh"
         >
           <span className={`live-beacon ${autoRefresh ? 'pulsing' : ''}`} />
-          <span>Stream {autoRefresh ? 'Live (5s)' : 'Paused'}</span>
+          <span>{autoRefresh ? 'Live (5s)' : 'Paused'}</span>
         </button>
 
         {/* Ingest Log Button */}
@@ -66,9 +66,9 @@ export default function Header({
           type="button"
           className="btn-action btn-primary"
           onClick={onOpenTestModal}
-          title="Inject a log event into the aggregator pipeline"
+          title="Inject a log entry into the aggregator pipeline"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
@@ -78,13 +78,13 @@ export default function Header({
         {/* Refresh Button */}
         <button
           type="button"
-          className="btn-action btn-secondary"
+          className="btn-action btn-icon-only"
           onClick={onRefresh}
           disabled={loading}
-          title="Perform immediate search refresh"
+          title="Refresh logs from Elasticsearch"
+          aria-label="Refresh logs"
         >
           <span className={`refresh-icon ${loading ? 'spinning' : ''}`}>↻</span>
-          <span>Refresh</span>
         </button>
       </div>
     </header>
