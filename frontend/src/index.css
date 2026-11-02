@@ -323,6 +323,7 @@ body {
 .stat-card.errors::before { background: linear-gradient(90deg, var(--color-danger), #e11d48); }
 .stat-card.warnings::before { background: linear-gradient(90deg, var(--color-amber), #d97706); }
 .stat-card.partitions::before { background: linear-gradient(90deg, var(--color-purple), #6366f1); }
+.stat-card.domains::before { background: linear-gradient(90deg, #10b981, #059669); }
 
 .stat-header {
   display: flex;
@@ -351,6 +352,7 @@ body {
 .stat-icon-badge.danger { background: var(--color-danger-bg); color: var(--color-danger); }
 .stat-icon-badge.warning { background: var(--color-amber-bg); color: var(--color-amber); }
 .stat-icon-badge.purple { background: var(--color-purple-bg); color: var(--color-purple); }
+.stat-icon-badge.emerald { background: rgba(16, 185, 129, 0.16); color: #34d399; }
 
 .stat-main-number h2 {
   font-size: 2.1rem;
@@ -387,6 +389,7 @@ body {
 .sub-badge.danger { background: var(--color-danger-bg); color: #fb7185; }
 .sub-badge.warning { background: var(--color-amber-bg); color: #fbbf24; }
 .sub-badge.purple { background: var(--color-purple-bg); color: #c084fc; }
+.sub-badge.emerald { background: rgba(16, 185, 129, 0.16); color: #34d399; }
 
 .sub-badge.pulse { animation: pulse-beacon 2s infinite ease-in-out; }
 
@@ -707,6 +710,71 @@ body {
   background: rgba(148, 163, 184, 0.14);
   color: #cbd5e1;
   border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+/* Multi-Domain Badges */
+.badge-domain {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: var(--font-sans);
+  background: rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  white-space: nowrap;
+}
+
+.badge-domain.fintech {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.badge-domain.healthcare {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fb7185;
+  border-color: rgba(244, 63, 94, 0.35);
+}
+
+.badge-domain.ecommerce {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.badge-domain.cybersecurity {
+  background: rgba(99, 102, 241, 0.18);
+  color: #a5b4fc;
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+.badge-domain.devops {
+  background: rgba(14, 165, 233, 0.15);
+  color: #38bdf8;
+  border-color: rgba(14, 165, 233, 0.35);
+}
+
+.badge-domain.iot {
+  background: rgba(132, 204, 22, 0.15);
+  color: #a3e635;
+  border-color: rgba(132, 204, 22, 0.35);
+}
+
+.badge-domain.streaming {
+  background: rgba(217, 70, 239, 0.15);
+  color: #e879f9;
+  border-color: rgba(217, 70, 239, 0.35);
+}
+
+.badge-domain.general {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.25);
 }
 
 .badge-source {

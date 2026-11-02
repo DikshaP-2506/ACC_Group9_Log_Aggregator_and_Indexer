@@ -98,3 +98,45 @@ def test_empty_message_and_source_rejected():
             message="Valid message",
             source="   "
         )
+
+
+def test_log_create_domain_normalization():
+    log = LogCreate(
+        level="INFO",
+        domain="  HEALTHCARE  ",
+        message="Patient vitals normal",
+        source="ehr-service"
+    )
+    assert log.domain == "healthcare"
+
+    log_none = LogCreate(
+        level="INFO",
+        message="Patient vitals normal",
+        source="ehr-service"
+    )
+    assert log_none.domain is None
+
+
+def test_infer_domain_multi_domains():
+    from app.models import infer_domain, LogEntry
+
+    assert infer_domain("ehr-service", "Patient record update") == "healthcare"
+    assert infer_domain("payment-service", "Payment processed") == "fintech"
+    assert infer_domain("cart-service", "Checkout items") == "ecommerce"
+    assert infer_domain("auth-service", "JWT token issued") == "cybersecurity"
+    assert infer_domain("db-replica-01", "PostgreSQL replication") == "devops"
+    assert infer_domain("sensor-node-hub", "Smart meter telemetry") == "iot"
+    assert infer_domain("video-transcoder", "HLS stream segmented") == "streaming"
+    assert infer_domain("custom-unknown-service", "Random message") == "general"
+
+
+def test_log_entry_domain_default():
+    from app.models import LogEntry
+    entry = LogEntry(
+        id="test-123",
+        timestamp=datetime.now(timezone.utc),
+        level="INFO",
+        message="System boot",
+        source="kernel"
+    )
+    assert entry.domain == "general"

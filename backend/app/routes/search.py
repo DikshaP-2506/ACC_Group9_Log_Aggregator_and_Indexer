@@ -22,9 +22,13 @@ def search_logs(
         default=None,
         description="Filter by log severity (e.g. INFO, WARN, WARNING, ERROR, DEBUG)."
     ),
+    domain: Optional[str] = Query(
+        default=None,
+        description="Filter by enterprise domain (e.g. fintech, healthcare, ecommerce, cybersecurity, devops, iot, streaming)."
+    ),
     source: Optional[str] = Query(
         default=None,
-        description="Filter by originating service name (e.g. auth-service, payment-service)."
+        description="Filter by originating service name (e.g. auth-service, payment-service, ehr-service)."
     ),
     partition: Optional[str] = Query(
         default=None,
@@ -54,6 +58,7 @@ def search_logs(
     return log_service.search_logs(
         query=query,
         level=level,
+        domain=domain,
         source=source,
         partition=partition,
         start_time=start_time,

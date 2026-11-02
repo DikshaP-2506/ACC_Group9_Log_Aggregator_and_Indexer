@@ -5,6 +5,8 @@ export default function FilterBar({
   setQuery,
   level,
   setLevel,
+  domain,
+  setDomain,
   source,
   setSource,
   partition,
@@ -13,6 +15,7 @@ export default function FilterBar({
   setTimeRange,
   limit,
   setLimit,
+  availableDomains = [],
   availableSources,
   availablePartitions,
   onReset,
@@ -21,6 +24,7 @@ export default function FilterBar({
   const activeFiltersCount = [
     query.trim(),
     level,
+    domain,
     source,
     partition,
     timeRange !== 'all' ? timeRange : ''
@@ -67,6 +71,30 @@ export default function FilterBar({
             <option value="WARNING">● WARNING</option>
             <option value="INFO">● INFO</option>
             <option value="DEBUG">● DEBUG</option>
+          </select>
+        </div>
+
+        {/* Enterprise Domain filter */}
+        <div className="select-wrapper">
+          <label className="select-label">Domain</label>
+          <select
+            className={`select-control ${domain ? 'has-value' : ''}`}
+            value={domain}
+            onChange={(e) => setDomain(e.target.value)}
+          >
+            <option value="">All Domains ({availableDomains.length})</option>
+            {availableDomains.map((d) => (
+              <option key={d} value={d}>
+                {d === 'fintech' ? '💳 FinTech' :
+                 d === 'healthcare' ? '🏥 Healthcare' :
+                 d === 'ecommerce' ? '🛒 E-Commerce' :
+                 d === 'cybersecurity' ? '🛡️ Cybersecurity' :
+                 d === 'devops' ? '⚙️ DevOps' :
+                 d === 'iot' ? '📡 IoT & Edge' :
+                 d === 'streaming' ? '🎬 Streaming' :
+                 `🌐 ${d.charAt(0).toUpperCase() + d.slice(1)}`}
+              </option>
+            ))}
           </select>
         </div>
 

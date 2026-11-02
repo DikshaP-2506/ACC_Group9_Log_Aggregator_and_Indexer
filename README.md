@@ -2,7 +2,26 @@
 
 **Advanced Cloud Computing & Kubernetes — Group 9 Project**
 
-A modular, scalable, distributed log aggregation and indexing platform featuring deterministic consistent-hash partitioning, full-text inverted-index search via Elasticsearch, resilient microservice shippers with offset persistence, and a modern React + Vite monitoring dashboard.
+A modular, scalable, multi-domain distributed log aggregation and indexing platform featuring deterministic consistent-hash partitioning, full-text inverted-index search via Elasticsearch, resilient microservice shippers with offset persistence, enterprise domain classification, and a modern React + Vite monitoring dashboard.
+
+---
+
+## Multi-Domain Architecture
+
+Group9-Log-Aggregator is designed to ingest, classify, route, and search telemetry data across diverse industry domains:
+
+| Enterprise Domain | Code | Example Services | Sample Telemetry Events |
+|---|---|---|---|
+| **FinTech & Payments** | `fintech` | `payment-service`, `ledger-service`, `fraud-detector` | Stripe checkouts, ACH clearing, double-entry reconciliation, card decline |
+| **Healthcare & MedTech** | `healthcare` | `ehr-service`, `patient-vitals-monitor`, `telehealth-gateway` | HL7 FHIR encounter ingest, ICU arrhythmia alerts, HIPAA audit access |
+| **E-Commerce & Retail** | `ecommerce` | `order-service`, `inventory-service`, `cart-service` | Shopping cart checkout, warehouse inventory delta, carrier tracking |
+| **Cybersecurity & SecOps** | `cybersecurity` | `auth-service`, `waf-edge-proxy`, `firewall-guard` | OAuth2/JWT issuance, WAF SQL injection blocks, brute-force mitigation |
+| **DevOps & Cloud Infra** | `devops` | `db-replica-01`, `k8s-autoscaler`, `redis-cluster` | HPA replica scaling, connection pool saturation, node CPU alerts |
+| **IoT & Edge Devices** | `iot` | `sensor-node-hub`, `telemetry-ingest`, `edge-gateway` | Smart meter kWh beacon, OTA firmware updates, MQTT session reconnects |
+| **Streaming & Media** | `streaming` | `video-transcoder`, `cdn-origin-stream`, `hls-segmenter` | 1080p60 encoding, adaptive bitrate throttling, CDN cache misses |
+
+- **Smart Domain Inference**: If a log entry omits the `domain` field, the aggregator automatically infers the appropriate enterprise domain based on service name heuristics and telemetry signatures.
+- **Explicit Domain Tagging**: Log shippers or pipeline clients can also pass an explicit `domain` property (`fintech`, `healthcare`, `ecommerce`, `cybersecurity`, `devops`, `iot`, `streaming`).
 
 ---
 
@@ -165,20 +184,20 @@ This starts:
 
 ## Testing & Verification
 
-### 1. Run Automated Test Suite (31 Tests)
+### 1. Run Automated Test Suite (39 Tests)
 
 ```powershell
 cd D:\Projects\ACC_Group9_Log_Aggregator_and_Indexer
 .\backend\.venv\Scripts\python.exe -m pytest -v
 ```
 
-All 31 unit, integration, and E2E pipeline tests pass:
-- `agent/test_agent.py`: Offset persistence, backoff retries, schema parsing.
-- `backend/tests/test_models.py`: Schema normalization and deterministic ID computation.
-- `backend/tests/test_health.py`: Health check and cluster connectivity.
-- `backend/tests/test_ingest.py`: Log ingestion and duplicate rejection (`409 Conflict`).
+All 39 unit, integration, and multi-domain tests pass:
+- `backend/tests/test_models.py`: Schema normalization, domain validation, automatic multi-domain inference, and deterministic ID computation.
+- `backend/tests/test_health.py`: Application health check and cluster connectivity probes.
+- `backend/tests/test_ingest.py`: Log ingestion, explicit & inferred enterprise domain tagging, and duplicate rejection (`409 Conflict`).
 - `backend/tests/test_router.py`: Deterministic routing and hash-ring failover.
-- `backend/tests/test_search.py`: Elasticsearch query construction and time filtering.
+- `backend/tests/test_search.py`: Elasticsearch query construction, domain filtering, time filtering, and multi-domain aggregations.
+- `agent/test_agent.py`: Multi-domain log generation, offset persistence, backoff retries, and schema parsing.
 - `backend/tests/test_e2e_full_pipeline.py`: Full end-to-end integration across all subsystems.
 
 ---
@@ -211,16 +230,28 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/routing/resolve?source=server-1" |
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/routing/partitions/partition-2/toggle" -Method Post | ConvertTo-Json
 ```
 
-#### D. Ingest a Log Entry (POST /logs)
+#### D. Ingest a Multi-Domain Log Entry (POST /logs)
 ```powershell
-$log = @{
+# 1. FinTech Domain Log
+$fintechLog = @{
     level = "INFO"
-    message = "Payment transaction verified"
+    domain = "fintech"
+    message = "Payment transaction verified and cleared via Stripe"
     source = "payment-service"
-    metadata = @{ amount = 129.50; currency = "USD" }
+    metadata = @{ amount = 129.50; currency = "USD"; gateway = "stripe" }
 } | ConvertTo-Json
 
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/logs" -Method Post -Body $log -ContentType "application/json" | ConvertTo-Json
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/logs" -Method Post -Body $fintechLog -ContentType "application/json" | ConvertTo-Json
+
+# 2. Healthcare Domain Log (Auto-inferred domain from EHR service)
+$healthLog = @{
+    level = "ERROR"
+    message = "Critical ICU telemetry alert: Cardiac arrhythmia detected on patient_412"
+    source = "ehr-service"
+    metadata = @{ ward = "ICU-North"; vital = "VTach" }
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/logs" -Method Post -Body $healthLog -ContentType "application/json" | ConvertTo-Json
 ```
 
 #### E. Test Duplicate Prevention
@@ -229,7 +260,8 @@ Sending the identical log ID a second time returns `HTTP 409 Conflict`:
 $dupLog = @{
     id = "fixed-unique-sample-001"
     level = "ERROR"
-    message = "Database lock acquisition failed"
+    domain = "ecommerce"
+    message = "Database lock acquisition failed during checkout"
     source = "order-service"
 } | ConvertTo-Json
 
@@ -244,13 +276,19 @@ try {
 }
 ```
 
-#### F. Query Logs by Keyword, Source, and Partition
+#### F. Query Logs by Domain, Keyword, Source, and Partition
 ```powershell
-# Search by keyword
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/logs/search?query=payment" | ConvertTo-Json -Depth 4
+# Filter by enterprise domain (e.g. healthcare, fintech, cybersecurity)
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/logs/search?domain=healthcare" | ConvertTo-Json -Depth 4
 
-# Filter by partition
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/logs/search?partition=partition-0&limit=5" | ConvertTo-Json -Depth 4
+# Search by keyword across inverted index
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/logs/search?query=arrhythmia" | ConvertTo-Json -Depth 4
+
+# Filter by partition and severity
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/logs/search?partition=partition-0&level=ERROR&limit=5" | ConvertTo-Json -Depth 4
+
+# Retrieve aggregated metrics with domain distribution
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/logs/stats" | ConvertTo-Json -Depth 4
 ```
 
 ---

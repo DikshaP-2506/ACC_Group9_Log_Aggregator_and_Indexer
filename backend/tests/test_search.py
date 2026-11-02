@@ -19,6 +19,7 @@ def test_search_logs_success():
                         "id": "log-abc-123",
                         "timestamp": "2026-10-12T12:00:00Z",
                         "level": "ERROR",
+                        "domain": "fintech",
                         "message": "Payment gateway timeout",
                         "source": "payment-service",
                         "metadata": {"order_id": 999}
@@ -29,7 +30,7 @@ def test_search_logs_success():
     }
 
     with patch("app.services.log_service.es_client.client", mock_es):
-        response = client.get("/logs/search?query=payment&level=ERROR&source=payment-service&page=1&limit=10")
+        response = client.get("/logs/search?query=payment&level=ERROR&domain=fintech&source=payment-service&page=1&limit=10")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
@@ -38,6 +39,37 @@ def test_search_logs_success():
         assert len(data["logs"]) == 1
         assert data["logs"][0]["id"] == "log-abc-123"
         assert data["logs"][0]["level"] == "ERROR"
+        assert data["logs"][0]["domain"] == "fintech"
+
+
+def test_search_logs_by_domain_filter():
+    """Verify search endpoint filters explicitly by domain."""
+    mock_es = MagicMock()
+    mock_es.search.return_value = {
+        "hits": {
+            "total": {"value": 1, "relation": "eq"},
+            "hits": [
+                {
+                    "_id": "log-hc-01",
+                    "_source": {
+                        "id": "log-hc-01",
+                        "timestamp": "2026-10-12T12:00:00Z",
+                        "level": "INFO",
+                        "domain": "healthcare",
+                        "message": "ICU vitals stream normal",
+                        "source": "patient-vitals-monitor"
+                    }
+                }
+            ]
+        }
+    }
+
+    with patch("app.services.log_service.es_client.client", mock_es):
+        response = client.get("/logs/search?domain=healthcare")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["logs"][0]["domain"] == "healthcare"
 
 
 def test_search_logs_invalid_time_range():
@@ -73,6 +105,12 @@ def test_get_log_stats_success():
                     {"key": "ERROR", "doc_count": 5}
                 ]
             },
+            "by_domain": {
+                "buckets": [
+                    {"key": "fintech", "doc_count": 8},
+                    {"key": "healthcare", "doc_count": 7}
+                ]
+            },
             "by_source": {
                 "buckets": [
                     {"key": "auth-service", "doc_count": 8},
@@ -97,5 +135,8 @@ def test_get_log_stats_success():
         assert data["info_count"] == 10
         assert "auth-service" in data["sources"]
         assert "payment-service" in data["sources"]
+        assert "fintech" in data["domains"]
+        assert "healthcare" in data["domains"]
+        assert data["domain_counts"]["healthcare"] == 7
         assert data["partition_counts"]["partition-0"] == 9
 

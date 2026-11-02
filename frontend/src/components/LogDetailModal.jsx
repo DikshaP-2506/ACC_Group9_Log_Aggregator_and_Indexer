@@ -69,6 +69,13 @@ export default function LogDetailModal({ log, onClose }) {
             </div>
 
             <div className="meta-box">
+              <span className="meta-label">Enterprise Domain</span>
+              <span className={`badge-domain ${log.domain || 'general'}`}>
+                {log.domain || 'general'}
+              </span>
+            </div>
+
+            <div className="meta-box">
               <span className="meta-label">Originating Source</span>
               <span className="badge-source">{log.source}</span>
             </div>

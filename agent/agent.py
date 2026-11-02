@@ -76,7 +76,7 @@ class LogAgent:
         try:
             parsed = json.loads(clean_line)
             if isinstance(parsed, dict) and "message" in parsed:
-                return {
+                res = {
                     "id": parsed.get("id"),
                     "timestamp": parsed.get("timestamp", datetime.now(timezone.utc).isoformat()),
                     "level": parsed.get("level", "INFO"),
@@ -84,6 +84,9 @@ class LogAgent:
                     "message": str(parsed["message"]),
                     "metadata": parsed.get("metadata", {})
                 }
+                if "domain" in parsed and parsed["domain"]:
+                    res["domain"] = parsed["domain"]
+                return res
         except (json.JSONDecodeError, ValueError):
             pass
 

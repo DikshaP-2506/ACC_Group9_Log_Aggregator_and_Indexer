@@ -14,6 +14,8 @@ export default function StatsCards({
   const infoCount = stats?.info_count ?? Math.max(0, total - errors - warnings);
   const activePartitions = activePartitionsCount ?? 3;
   const totalPartitions = totalPartitionsCount ?? 3;
+  const domainsList = stats?.domains || Object.keys(stats?.domain_counts || {});
+  const domainsCount = domainsList.length > 0 ? domainsList.length : 7;
 
   const errorRate = total > 0 ? ((errors / total) * 100).toFixed(1) : '0.0';
   const warningRate = total > 0 ? ((warnings / total) * 100).toFixed(1) : '0.0';
@@ -111,6 +113,30 @@ export default function StatsCards({
             {activePartitions === totalPartitions ? 'All Active' : 'Failover Mode'}
           </span>
           <span className="sub-caption">Deterministic SHA-256 router</span>
+        </div>
+      </div>
+
+      {/* 5. Enterprise Domains */}
+      <div className="stat-card domains">
+        <div className="stat-card-glow" />
+        <div className="stat-header">
+          <span className="stat-label">Enterprise Domains</span>
+          <span className="stat-icon-badge emerald">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+            </svg>
+          </span>
+        </div>
+        <div className="stat-main-number">
+          <h2>
+            {domainsCount}
+            <span className="number-sub-denom"> Active</span>
+          </h2>
+        </div>
+        <div className="stat-sub-info">
+          <span className="sub-badge emerald">Multi-Domain</span>
+          <span className="sub-caption">FinTech, Healthcare, Cyber, DevOps...</span>
         </div>
       </div>
     </div>

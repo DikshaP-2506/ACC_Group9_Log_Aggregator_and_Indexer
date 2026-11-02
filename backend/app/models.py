@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 import hashlib
+import re
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 
@@ -12,6 +13,55 @@ class LogLevel(str, Enum):
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
+
+
+# Domain classification keyword rules for automatic inference
+DOMAIN_KEYWORDS: Dict[str, List[str]] = {
+    "fintech": [
+        "payment", "stripe", "paypal", "ledger", "transaction", "billing",
+        "fraud", "invoice", "refund", "card", "bank", "settlement", "wire"
+    ],
+    "healthcare": [
+        "health", "ehr", "emr", "patient", "vitals", "clinic", "hospital", "telehealth",
+        "lab", "fhir", "hl7", "icu", "doctor", "medical", "pharmacy", "hipaa"
+    ],
+    "ecommerce": [
+        "order", "cart", "catalog", "inventory", "sku", "warehouse", "product", "shipping",
+        "delivery", "stock", "fulfillment", "store", "customer", "checkout"
+    ],
+    "cybersecurity": [
+        "auth", "login", "jwt", "waf", "firewall", "token", "session", "oauth",
+        "ddos", "brute", "vulnerability", "malware", "siem", "ssl", "tls", "security"
+    ],
+    "iot": [
+        "iot", "sensor", "telemetry", "firmware", "ota", "lora", "lorawan",
+        "mqtt", "coap", "beacon", "meter", "actuator"
+    ],
+    "streaming": [
+        "stream", "video", "audio", "transcode", "codec", "cdn", "hls", "dash",
+        "bitrate", "fps", "buffer", "encoder", "segment"
+    ],
+    "devops": [
+        "k8s", "kubernetes", "pod", "container", "docker", "replica", "database", "postgres",
+        "mysql", "redis", "cpu", "memory", "disk", "cluster", "deploy", "ci-cd", "node"
+    ]
+}
+
+
+def infer_domain(source: str, message: str = "") -> str:
+    """Intelligently infer enterprise domain from service source name or message content."""
+    src = source.lower()
+    # 1. Match against source service name first
+    for domain, keywords in DOMAIN_KEYWORDS.items():
+        if any(kw in src for kw in keywords):
+            return domain
+
+    # 2. Match against message content with word boundaries
+    text = f"{src} {message}".lower()
+    for domain, keywords in DOMAIN_KEYWORDS.items():
+        if any(re.search(rf"\b{re.escape(kw)}\b", text) for kw in keywords):
+            return domain
+    return "general"
 
 
 class LogCreate(BaseModel):
@@ -28,13 +78,17 @@ class LogCreate(BaseModel):
     level: LogLevel = Field(
         description="Severity level (DEBUG, INFO, WARN, WARNING, ERROR, CRITICAL)."
     )
+    domain: Optional[str] = Field(
+        default=None,
+        description="Enterprise domain (e.g. fintech, healthcare, ecommerce, cybersecurity, devops, iot, streaming)."
+    )
     message: str = Field(
         min_length=1,
         description="Log message content."
     )
     source: str = Field(
         min_length=1,
-        description="Source identifier (e.g. auth-service, payment-service, order-service)."
+        description="Source identifier (e.g. auth-service, payment-service, ehr-service, order-service)."
     )
     metadata: Optional[Dict[str, Any]] = Field(
         default_factory=dict,
@@ -50,6 +104,13 @@ class LogCreate(BaseModel):
                 return "WARNING"
             return clean_str
         return v
+
+    @field_validator("domain", mode="before")
+    @classmethod
+    def normalize_domain(cls, v: Any) -> Optional[str]:
+        if isinstance(v, str) and v.strip():
+            return v.strip().lower()
+        return None
 
     @field_validator("message", "source")
     @classmethod
@@ -78,6 +139,7 @@ class LogEntry(BaseModel):
     id: str
     timestamp: datetime
     level: str
+    domain: str = Field(default="general", description="Categorized enterprise domain.")
     message: str
     source: str
     partition: str = Field(default="partition-0", description="Assigned logical routing partition.")

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # Elasticsearch configuration
-    elasticsearch_url: str = "http://localhost:9200"
+    elasticsearch_url: str = "http://127.0.0.1:9200"
     log_index_name: str = "logs"
     request_timeout: int = 10
 

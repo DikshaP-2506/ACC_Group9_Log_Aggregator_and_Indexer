@@ -78,3 +78,34 @@ def test_ingest_es_unavailable():
         assert response.status_code == 503
         data = response.json()
         assert data["error"] == "Service Unavailable"
+
+
+def test_ingest_explicit_and_inferred_domain():
+    """Verify explicit domain and inferred domain during log ingestion."""
+    mock_es = MagicMock()
+    mock_es.create.return_value = {"result": "created"}
+
+    with patch("app.services.log_service.es_client.client", mock_es):
+        # 1. Explicit domain
+        payload_health = {
+            "level": "INFO",
+            "domain": "healthcare",
+            "message": "HL7 FHIR Patient Encounter record ingested",
+            "source": "ehr-service",
+            "metadata": {"patient_id": "PT-990"}
+        }
+        res1 = client.post("/logs", json=payload_health)
+        assert res1.status_code == 201
+        data1 = res1.json()
+        assert data1["log"]["domain"] == "healthcare"
+
+        # 2. Inferred domain from source
+        payload_cyber = {
+            "level": "WARNING",
+            "message": "WAF blocked suspicious request",
+            "source": "waf-edge-proxy"
+        }
+        res2 = client.post("/logs", json=payload_cyber)
+        assert res2.status_code == 201
+        data2 = res2.json()
+        assert data2["log"]["domain"] == "cybersecurity"

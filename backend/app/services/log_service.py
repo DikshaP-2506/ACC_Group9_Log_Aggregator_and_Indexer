@@ -6,7 +6,7 @@ from elasticsearch import exceptions
 
 from app.config import settings
 from app.elasticsearch_client import es_client
-from app.models import LogCreate, LogEntry, SearchResponse
+from app.models import LogCreate, LogEntry, SearchResponse, infer_domain
 from app.services.router import distribution_engine, DistributionEngine
 
 logger = logging.getLogger(__name__)
@@ -38,11 +38,13 @@ class LogService:
         """Validate, assign ID, prevent duplicates, route to partition, and index log into Elasticsearch."""
         log_id = payload.compute_deterministic_id()
         assigned_partition = payload.partition or self.router.route(payload.source)
+        assigned_domain = payload.domain or infer_domain(payload.source, payload.message)
 
         log_entry = LogEntry(
             id=log_id,
             timestamp=payload.timestamp,
             level=payload.level.value,
+            domain=assigned_domain,
             message=payload.message,
             source=payload.source,
             partition=assigned_partition,
@@ -53,6 +55,7 @@ class LogService:
             "id": log_entry.id,
             "timestamp": log_entry.timestamp.isoformat(),
             "level": log_entry.level,
+            "domain": log_entry.domain,
             "message": log_entry.message,
             "source": log_entry.source,
             "partition": log_entry.partition,
@@ -86,6 +89,7 @@ class LogService:
         self,
         query: Optional[str] = None,
         level: Optional[str] = None,
+        domain: Optional[str] = None,
         source: Optional[str] = None,
         partition: Optional[str] = None,
         start_time: Optional[datetime] = None,
@@ -120,11 +124,15 @@ class LogService:
                 normalized_level = "WARNING"
             filter_clauses.append({"term": {"level": normalized_level}})
 
-        # 3. Exact match filter by source service
+        # 3. Exact match filter by enterprise domain
+        if domain and domain.strip():
+            filter_clauses.append({"term": {"domain": domain.strip().lower()}})
+
+        # 4. Exact match filter by source service
         if source and source.strip():
             filter_clauses.append({"term": {"source": source.strip()}})
 
-        # 4. Exact match filter by logical routing partition
+        # 5. Exact match filter by logical routing partition
         if partition and partition.strip():
             filter_clauses.append({
                 "bool": {
@@ -136,7 +144,7 @@ class LogService:
                 }
             })
 
-        # 5. Range filter by timestamp
+        # 6. Range filter by timestamp
         if start_time or end_time:
             time_range: Dict[str, str] = {}
             if start_time:
@@ -169,12 +177,17 @@ class LogService:
             logs: List[LogEntry] = []
             for hit in response.get("hits", {}).get("hits", []):
                 source_data = hit.get("_source", {})
+                source_val = source_data.get("source", "unknown")
+                msg_val = source_data.get("message", "")
+                assigned_domain = source_data.get("domain") or infer_domain(source_val, msg_val)
+
                 logs.append(LogEntry(
                     id=source_data.get("id", hit.get("_id")),
                     timestamp=source_data.get("timestamp"),
                     level=source_data.get("level", "INFO"),
-                    message=source_data.get("message", ""),
-                    source=source_data.get("source", "unknown"),
+                    domain=assigned_domain,
+                    message=msg_val,
+                    source=source_val,
                     partition=source_data.get("partition", "partition-0"),
                     metadata=source_data.get("metadata", {})
                 ))
@@ -199,13 +212,14 @@ class LogService:
             raise
 
     def get_log_stats(self) -> Dict[str, Any]:
-        """Aggregate log counts, levels, distinct sources, and partition distribution from Elasticsearch."""
+        """Aggregate log counts, levels, distinct sources, domains, and partition distribution from Elasticsearch."""
         try:
             res = self._es.client.search(
                 index=settings.log_index_name,
                 size=0,
                 aggs={
                     "by_level": {"terms": {"field": "level", "size": 10}},
+                    "by_domain": {"terms": {"field": "domain", "size": 50}},
                     "by_source": {"terms": {"field": "source", "size": 100}},
                     "by_partition": {"terms": {"field": "partition.keyword", "size": 50}}
                 }
@@ -217,6 +231,14 @@ class LogService:
             level_counts = {
                 b["key"]: b["doc_count"]
                 for b in aggs.get("by_level", {}).get("buckets", [])
+            }
+            domains = [
+                b["key"]
+                for b in aggs.get("by_domain", {}).get("buckets", [])
+            ]
+            domain_counts = {
+                b["key"]: b["doc_count"]
+                for b in aggs.get("by_domain", {}).get("buckets", [])
             }
             sources = [
                 b["key"]
@@ -239,6 +261,8 @@ class LogService:
                 "info_count": info_count,
                 "debug_count": debug_count,
                 "level_counts": level_counts,
+                "domains": domains,
+                "domain_counts": domain_counts,
                 "sources": sources,
                 "partition_counts": partition_counts
             }
@@ -250,6 +274,8 @@ class LogService:
                 "info_count": 0,
                 "debug_count": 0,
                 "level_counts": {},
+                "domains": [],
+                "domain_counts": {},
                 "sources": [],
                 "partition_counts": {}
             }
@@ -258,6 +284,7 @@ class LogService:
             raise ElasticsearchUnavailableError("Elasticsearch is currently unreachable.")
         except exceptions.ApiError as exc:
             logger.error(f"Elasticsearch API error during stats aggregation: {exc}")
+            raise
             raise
 
 

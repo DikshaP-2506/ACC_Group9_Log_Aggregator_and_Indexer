@@ -16,6 +16,7 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [level, setLevel] = useState('');
+  const [domain, setDomain] = useState('');
   const [source, setSource] = useState('');
   const [partition, setPartition] = useState('');
   const [timeRange, setTimeRange] = useState('all');
@@ -59,6 +60,7 @@ export default function App() {
       const data = await fetchLogs({
         query: debouncedQuery,
         level,
+        domain,
         source,
         partition,
         startTime,
@@ -72,7 +74,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedQuery, level, source, partition, calculateStartTime, page, limit]);
+  }, [debouncedQuery, level, domain, source, partition, calculateStartTime, page, limit]);
 
   // Metadata & Stats fetch
   const loadMetadataAndStats = useCallback(async () => {
@@ -109,6 +111,15 @@ export default function App() {
     return () => clearInterval(interval);
   }, [autoRefresh, loadLogs, loadMetadataAndStats]);
 
+  // Dynamically populated domains
+  const availableDomains = useMemo(() => {
+    const defaults = ['fintech', 'healthcare', 'ecommerce', 'cybersecurity', 'devops', 'iot', 'streaming'];
+    const domainsFromStats = stats?.domains || [];
+    const domainsFromCurrentLogs = logs.map((l) => l.domain).filter(Boolean);
+    const combined = Array.from(new Set([...defaults, ...domainsFromStats, ...domainsFromCurrentLogs]));
+    return combined.sort();
+  }, [stats, logs]);
+
   // Dynamically populated sources (zero hardcoding)
   const availableSources = useMemo(() => {
     const sourcesFromStats = stats?.sources || [];
@@ -128,6 +139,7 @@ export default function App() {
   const handleResetFilters = () => {
     setQuery('');
     setLevel('');
+    setDomain('');
     setSource('');
     setPartition('');
     setTimeRange('all');
@@ -168,6 +180,8 @@ export default function App() {
         setQuery={setQuery}
         level={level}
         setLevel={(lvl) => { setLevel(lvl); setPage(1); }}
+        domain={domain}
+        setDomain={(d) => { setDomain(d); setPage(1); }}
         source={source}
         setSource={(src) => { setSource(src); setPage(1); }}
         partition={partition}
@@ -176,6 +190,7 @@ export default function App() {
         setTimeRange={(tr) => { setTimeRange(tr); setPage(1); }}
         limit={limit}
         setLimit={(lim) => { setLimit(lim); setPage(1); }}
+        availableDomains={availableDomains}
         availableSources={availableSources}
         availablePartitions={availablePartitions}
         onReset={handleResetFilters}

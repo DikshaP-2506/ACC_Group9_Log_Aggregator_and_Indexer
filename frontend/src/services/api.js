@@ -10,6 +10,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL !== undefined
 export async function fetchLogs({
   query = '',
   level = '',
+  domain = '',
   source = '',
   partition = '',
   startTime = '',
@@ -21,6 +22,7 @@ export async function fetchLogs({
 
   if (query.trim()) params.append('query', query.trim());
   if (level.trim()) params.append('level', level.trim());
+  if (domain.trim()) params.append('domain', domain.trim());
   if (source.trim()) params.append('source', source.trim());
   if (partition.trim()) params.append('partition', partition.trim());
   if (startTime) params.append('start_time', startTime);

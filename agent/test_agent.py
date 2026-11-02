@@ -15,9 +15,17 @@ def test_generator_single_log_schema():
     assert data["source"] == "server-test"
     assert data["level"] in ["INFO", "WARNING", "ERROR"]
     assert "timestamp" in data
+    assert "domain" in data
     assert "message" in data
     assert "metadata" in data
     assert data["metadata"]["source_host"] == "server-test"
+
+
+def test_generator_specific_domain():
+    log_json = generate_single_log(source="ehr-service", domain="healthcare")
+    data = json.loads(log_json)
+    assert data["domain"] == "healthcare"
+    assert data["source"] == "ehr-service"
 
 
 def test_agent_parse_json_log_line():

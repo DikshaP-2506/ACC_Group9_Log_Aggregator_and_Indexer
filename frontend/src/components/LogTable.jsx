@@ -120,10 +120,11 @@ export default function LogTable({
                 <tr>
                   <th style={{ width: '175px' }}>Timestamp (UTC)</th>
                   <th style={{ width: '100px' }}>Level</th>
-                  <th style={{ width: '140px' }}>Source Service</th>
-                  <th style={{ width: '130px' }}>Hash Partition</th>
+                  <th style={{ width: '115px' }}>Domain</th>
+                  <th style={{ width: '135px' }}>Source Service</th>
+                  <th style={{ width: '125px' }}>Hash Partition</th>
                   <th>Log Message Payload</th>
-                  <th style={{ width: '90px', textAlign: 'center' }}>Inspect</th>
+                  <th style={{ width: '85px', textAlign: 'center' }}>Inspect</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,6 +146,11 @@ export default function LogTable({
                         <span className={`badge-level ${lvlClass}`}>
                           <span className="level-dot" />
                           {log.level}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge-domain ${log.domain || 'general'}`} title={`Enterprise Domain: ${log.domain || 'general'}`}>
+                          {log.domain || 'general'}
                         </span>
                       </td>
                       <td>

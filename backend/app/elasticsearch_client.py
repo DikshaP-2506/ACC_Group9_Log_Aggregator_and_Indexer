@@ -11,6 +11,7 @@ INDEX_MAPPING: Dict[str, Any] = {
             "id": {"type": "keyword"},
             "timestamp": {"type": "date"},
             "level": {"type": "keyword"},
+            "domain": {"type": "keyword"},
             "source": {"type": "keyword"},
             "message": {
                 "type": "text",
@@ -41,7 +42,9 @@ class ElasticsearchClientWrapper:
         if self._client is None:
             self._client = Elasticsearch(
                 hosts=[self.url],
-                request_timeout=settings.request_timeout
+                request_timeout=settings.request_timeout,
+                max_retries=0,
+                retry_on_timeout=False
             )
         return self._client
 
@@ -56,7 +59,7 @@ class ElasticsearchClientWrapper:
     def is_connected(self) -> bool:
         """Check if Elasticsearch is reachable."""
         try:
-            return bool(self.client.ping())
+            return bool(self.client.options(request_timeout=1, max_retries=0).ping())
         except Exception as exc:
             logger.warning(f"Elasticsearch ping failed: {exc}")
             return False
