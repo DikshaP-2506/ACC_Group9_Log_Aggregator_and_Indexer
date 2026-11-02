@@ -2,9 +2,13 @@ import argparse
 from datetime import datetime, timezone
 import json
 import logging
+import os
 from pathlib import Path
+import sys
 import time
 from typing import Any, Dict, Optional, Tuple
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx
 

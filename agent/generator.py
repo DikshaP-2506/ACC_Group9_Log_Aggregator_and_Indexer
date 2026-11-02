@@ -5,8 +5,11 @@ import logging
 import os
 from pathlib import Path
 import random
+import sys
 import time
 from typing import Any, Dict, List, Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from agent.config import config
 
